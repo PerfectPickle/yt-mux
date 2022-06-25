@@ -1,5 +1,5 @@
 """
-For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best webm streams available.
+For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available, generally favouring VP9 and av01. Situationally avc will be chosen depending on bit rate differential
 """
 # the above docstring is accessible within the variable: __doc__
 
@@ -15,6 +15,7 @@ def create_parser():
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=os.getcwd())
     parser.add_argument("-r", action='store_true', help="make additional remux to Davinci Resolve friendly .mov file")
+    parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND VP9")
     parser.add_argument("-m", action='store_true', help="download separate m4a audio and make separate WAV file (pcm_s16le) transcode of downloaded m4a audio (useful for DaVinci Resolve)")
     return parser
 
@@ -41,20 +42,21 @@ def get_best_stream_codes(url):
         elif "m4a" in line and "audio only" in line:
             m4a_streams.append(line)
 
-    get_best_vp9_code(vp9_streams)
-    # if line has equal/best fps, resolution, and file size, download.
+    vp9_code = get_best_video_code(vp9_streams)
+    opus_code = get_best_opus_code(opus_streams)
+    m4a_code = get_best_m4a_code(m4a_streams)
 
-# does yt-dlp -F and returns the ID code corresponding to the highest quality VP9 stream
-def get_best_vp9_code(vp9_streams):
+# does yt-dlp -F and returns the ID code corresponding to the highest quality video stream
+def get_best_video_code(video_streams):
     # [10:19] is resolution, [22:24] is fps, [38:43] is bit rate 
     best_resolution = 0
     best_fps = 0
     highest_bitrate = 0
     best_code = 0
-    for stream in vp9_streams:
+    for stream in video_streams:
         res = int(str(stream[10:19].replace("x", "")))
         fps = int(stream[22:24])
-        tbr = int(stream[38:43])
+        tbr = int(stream[38:43].replace("k", ""))
 
         if res >= best_resolution and fps >= best_fps and tbr >= highest_bitrate:
             best_resolution = res
@@ -74,23 +76,57 @@ def get_best_vp9_code(vp9_streams):
                 has_better = True
 
             if has_better:
-                print("The best VP9 stream could not be be clearly determined.")
+                print("The best video stream could not be be clearly determined.")
                 exit()
 
-    print("best ")
-    print("code: " + best_code)
-    print("res: " + best_resolution)
-    print("fps: " + best_fps)
-    print("tbr: " + highest_bitrate)
+    print("----")
+    print("best - vp9")
+    print("code: " + str(best_code))
+    print("res: " + str(best_resolution))
+    print("fps: " + str(best_fps))
+    print("tbr: " + str(highest_bitrate))
 
     return best_code
 
+def get_best_opus_code(opus_streams):
+    # [38:43] is bit rate 
 
-def get_best_opus_code():
-    pass
+    highest_bitrate = 0
+    best_code = 0
 
-def get_best_m4a_code():
-    pass
+    for stream in opus_streams:
+        tbr = int(stream[38:43].replace("k", ""))
+
+        if tbr >= highest_bitrate:
+            highest_bitrate = tbr
+            best_code = int(stream[0:3])
+    
+    print("----")
+    print("best - opus")
+    print("code: " + str(best_code))
+    print("tbr: " + str(highest_bitrate))
+
+    return best_code
+
+def get_best_m4a_code(m4a_streams):
+    # [38:43] is bit rate 
+
+    highest_bitrate = 0
+    best_code = 0
+
+    for stream in m4a_streams:
+        tbr = int(stream[38:43].replace("k", ""))
+
+        if tbr >= highest_bitrate:
+            highest_bitrate = tbr
+            best_code = int(stream[0:3])
+
+    print("----")
+    print("best - m4a")
+    print("code: " + str(best_code))
+    print("tbr: " + str(highest_bitrate))
+
+    return best_code
 
 args = get_args()
 print(args)
