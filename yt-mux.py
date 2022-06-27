@@ -40,6 +40,18 @@ def get_args():
     return parser.parse_args()
 
 
+def check_args():
+    output = pathlib.Path(args.output)
+
+    #if output is dir, or if directory to specified output file exists
+    if output.is_dir() or pathlib.Path(os.path.split(str(args.output))[0]).is_dir():
+        pass
+    else:
+        print("Invalid output.")
+        ("-------------------------")
+        exit()
+
+
 def get_best_streams(url):
     output = subprocess.check_output(["yt-dlp", "-F", url], shell=False)
     data = output.decode("utf-8")
@@ -78,8 +90,28 @@ def get_best_streams(url):
     return vp9_info, avc_info, opus_info, m4a_info, av1_info
 
 
+def get_best_video_code(vp9: video_stream_info, avc: video_stream_info):
+    # to roughly equalize vp9 and avc quality-to-bitrate ratio. 
+    # avc is considered higher quality if its bitrate is more than double a vp9
+    avc_tbr_multiplier = 2.0
+
+    if vp9.fps >= avc.fps and vp9.res >= avc.res and vp9.tbr * avc_tbr_multiplier >= avc.tbr:
+        return vp9.stream_id
+    elif avc.fps >= vp9.fps and avc.res >= vp9.res and avc.tbr >= vp9.tbr * avc_tbr_multiplier:
+        return avc.stream_id
+    else:
+        print("---")
+        print("Could not clearly determine if vp9 or avc stream is higher quality.")
+        print("-------------------------")
+        exit()
+
+
+
 def download_streams(url):
     vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(url)
+
+    subprocess.call(["yt-dlp", "-f", ]])
+
 
 
 # mux video file and audio file together
