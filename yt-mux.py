@@ -1,5 +1,5 @@
 """
-For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available, generally favouring VP9 and av01. Situationally avc will be chosen depending on bit rate differential
+For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, generally favouring VP9 and av01. Situationally avc will be chosen depending on bit rate differential. Downloads first to CWD then moves file to output location if specified.
 """
 # the above docstring is accessible within the variable: __doc__
 
@@ -39,7 +39,6 @@ def get_args():
 
     return parser.parse_args()
 
-
 def check_args():
     output = pathlib.Path(args.output)
 
@@ -50,7 +49,6 @@ def check_args():
         print("Invalid output.")
         ("-------------------------")
         exit()
-
 
 def get_best_streams(url):
     output = subprocess.check_output(["yt-dlp", "-F", url], shell=False)
@@ -89,47 +87,70 @@ def get_best_streams(url):
     
     return vp9_info, avc_info, opus_info, m4a_info, av1_info
 
-
-def get_best_video_code(vp9: video_stream_info, avc: video_stream_info):
+def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
     # to roughly equalize vp9 and avc quality-to-bitrate ratio. 
     # avc is considered higher quality if its bitrate is more than double a vp9
     avc_tbr_multiplier = 2.0
 
     if vp9.fps >= avc.fps and vp9.res >= avc.res and vp9.tbr * avc_tbr_multiplier >= avc.tbr:
-        return vp9.stream_id
+        return vp9
     elif avc.fps >= vp9.fps and avc.res >= vp9.res and avc.tbr >= vp9.tbr * avc_tbr_multiplier:
-        return avc.stream_id
+        return avc
     else:
         print("---")
         print("Could not clearly determine if vp9 or avc stream is higher quality.")
         print("-------------------------")
         exit()
 
+def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best):
 
-
-def download_streams(url):
-    vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(url)
-
-    best_vid_id = get_best_video_code(vp9_best, avc_best)
-    subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid_id), url], shell=False)
+    #subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid.stream_id), url], shell=False)
     
+    # download best muxable audio, AND m4a if option selected and m4a not muxable
+    if vp9_best is best_vid and args.m:
+        # download opus_best
+        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
+        # download m4a_best
+        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
+    elif vp9_best is best_vid:
+        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
+    elif avc_best is best_vid:
+        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
+    else:
+        print("This shouldn't happen, ever.")
+
+    if av1_best:
+        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(av1_best.stream_id), url], shell=False)
+
+    # mux best video and audio
+
+    # remux to vp9mov if option selected
+
     # if str(args.output) != os.getcwd():
     #     subprocess.call(["mv", ])
 
-
-
 # mux video file and audio file together
-def mux():
-    pass
+def mux(best_vid):
+    # get files
+    cwd_files = os.scandir()
 
+    if "youtu.be/" in str(args.url):
+        video_ID = str(args.url).split(".be/")[1].split('/')[0]
+    else:
+        video_ID = str(args.url).split("/watch?v=")[1].split('/')[0]
+
+    print(video_ID)
+
+    # if vp9_best is best_vid:
+    #     for file in cwd_files:
+    #         if vp9_best. file.name
+        
 
 def remux_to_vp9mov():
     pass
 
-
 def transcode_to_wav():
     pass
-
 
 # does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
 def get_best_video_info(video_streams):
@@ -175,7 +196,6 @@ def get_best_video_info(video_streams):
 
     return best_video_info
 
-
 def get_best_audio_info(audio_streams):
     # [38:43] is bit rate 
 
@@ -195,6 +215,14 @@ def get_best_audio_info(audio_streams):
 
 
 args = get_args()
-#print(str(args.url))
-download_streams(str(args.url))
+check_args()
+
+# get best stream objects
+vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.url))
+best_vid = determine_best_video_codec(vp9_best, avc_best)
+
+#download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
+
+mux(best_vid)
+
 print(args)
