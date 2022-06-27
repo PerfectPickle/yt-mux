@@ -104,7 +104,7 @@ def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
 
 def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best):
 
-    #subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid.stream_id), url], shell=False)
+    subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid.stream_id), url], shell=False)
     
     # download best muxable audio, AND m4a if option selected and m4a not muxable
     if vp9_best is best_vid and args.m:
@@ -130,7 +130,7 @@ def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1
     #     subprocess.call(["mv", ])
 
 # mux video file and audio file together
-def mux(best_vid):
+def mux(best_vid, vp9_best, avc_best):
     # get files
     cwd_files = os.scandir()
 
@@ -141,9 +141,30 @@ def mux(best_vid):
 
     print(video_ID)
 
-    # if vp9_best is best_vid:
-    #     for file in cwd_files:
-    #         if vp9_best. file.name
+    video_file = False
+    audio_file = False
+    vcodec = "vp9"
+    acodec = "opus"
+    suffix = ".mkv"
+
+    if avc_best is best_vid:
+        vcodec = "avc"
+        acodec = "m4a"
+        suffix = ".mp4"
+
+    for file in cwd_files:
+        if vcodec in file.name and video_ID in file.name and file.is_file():
+            video_file = pathlib.Path(file.path)
+        elif acodec in file.name and video_ID in file.name and file.is_file():
+            audio_file = pathlib.Path(file.path)
+
+    if video_file and audio_file:
+        #muxed_file_name = str(video_file.with_suffix(".mkv").name).replace(vcodec, "muxed")
+        muxed_file_name = str(video_file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]_muxed" + suffix
+        muxed_file_name = muxed_file_name.replace(" ", "_")
+        subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", muxed_file_name], shell=False)
+            
+    
         
 
 def remux_to_vp9mov():
@@ -221,8 +242,8 @@ check_args()
 vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.url))
 best_vid = determine_best_video_codec(vp9_best, avc_best)
 
-#download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
+download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
 
-mux(best_vid)
+mux(best_vid, vp9_best, avc_best)
 
 print(args)
