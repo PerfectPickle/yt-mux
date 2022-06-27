@@ -15,7 +15,7 @@ def create_parser():
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=os.getcwd())
     parser.add_argument("-r", action='store_true', help="make additional remux to Davinci Resolve friendly .mov file")
-    parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND VP9")
+    parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND the best VP9/AVC stream")
     parser.add_argument("-m", action='store_true', help="download separate m4a audio and make separate WAV file (pcm_s16le) transcode of downloaded m4a audio (useful for DaVinci Resolve)")
     return parser
 
@@ -31,20 +31,29 @@ def get_best_stream_codes(url):
 
     stream_info = data.split('\n')
     #data = os.system(str("yt-dlp -F " + url))
-    vp9_streams = []
+    video_streams = []
     opus_streams = []
     m4a_streams = []
+    av1_streams = []
     for line in stream_info:
-        if "vp9" in line:
-            vp9_streams.append(line)
+        if "vp9" in line or "avc" in line:
+            video.append(line)
         elif "opus" in line:
             opus_streams.append(line)
         elif "m4a" in line and "audio only" in line:
             m4a_streams.append(line)
+        elif "av01" in line or "av1" in line:
+            av1_streams.append(line)
 
-    vp9_code = get_best_video_code(vp9_streams)
+    video_code = get_best_video_code(vp9_streams)
     opus_code = get_best_opus_code(opus_streams)
     m4a_code = get_best_m4a_code(m4a_streams)
+
+    if args.b and len(av1_streams > 0):
+        av1_code = get_best_video_code(av1_streams)
+    else:
+        av1_code = False
+
 
 # does yt-dlp -F and returns the ID code corresponding to the highest quality video stream
 def get_best_video_code(video_streams):
