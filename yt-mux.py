@@ -77,7 +77,7 @@ def get_best_streams(url):
             av1_streams.append(line)
 
     vp9_info = get_best_video_info(vp9_streams)
-    avc_info = get_best_video_info(video_streams)
+    avc_info = get_best_video_info(avc_streams)
 
     opus_info = get_best_audio_info(opus_streams)
     m4a_info = get_best_audio_info(m4a_streams)
@@ -110,7 +110,11 @@ def get_best_video_code(vp9: video_stream_info, avc: video_stream_info):
 def download_streams(url):
     vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(url)
 
-    subprocess.call(["yt-dlp", "-f", ]])
+    best_vid_id = get_best_video_code(vp9_best, avc_best)
+    subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid_id), url], shell=False)
+    
+    # if str(args.output) != os.getcwd():
+    #     subprocess.call(["mv", ])
 
 
 
@@ -161,7 +165,7 @@ def get_best_video_info(video_streams):
                 exit()
 
     print("----")
-    print("best - vp9")
+    print("best - for unique vcodec")
     print("code: " + str(best_code))
     print("res: " + str(best_resolution))
     print("fps: " + str(best_fps))
@@ -191,6 +195,6 @@ def get_best_audio_info(audio_streams):
 
 
 args = get_args()
+#print(str(args.url))
+download_streams(str(args.url))
 print(args)
-print(str(args.url))
-get_best_stream_codes(str(args.url))
