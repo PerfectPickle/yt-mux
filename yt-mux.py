@@ -8,6 +8,19 @@ import os
 import subprocess
 import pathlib
 
+class video_stream_info:
+    def __init__(self, stream_id, res, fps, tbr):
+        self.stream_id=stream_id
+        self.res=res
+        self.fps=fps
+        self.tbr=tbr
+
+class audio_stream_info:
+    def __init__(self, stream_id, tbr):
+        self.stream_id=stream_id
+        self.tbr=tbr
+
+
 # create parser, add arguments, return parser
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp")
@@ -19,25 +32,31 @@ def create_parser():
     parser.add_argument("-m", action='store_true', help="download separate m4a audio and make separate WAV file (pcm_s16le) transcode of downloaded m4a audio (useful for DaVinci Resolve)")
     return parser
 
+
 # parse and return args
 def get_args():
     parser = create_parser()
 
     return parser.parse_args()
 
-def get_best_stream_codes(url):
+
+def get_best_streams(url):
     output = subprocess.check_output(["yt-dlp", "-F", url], shell=False)
     data = output.decode("utf-8")
 
     stream_info = data.split('\n')
     #data = os.system(str("yt-dlp -F " + url))
-    video_streams = []
+    vp9_streams = []
+    avc_streams = []
     opus_streams = []
     m4a_streams = []
     av1_streams = []
+
     for line in stream_info:
-        if "vp9" in line or "avc" in line:
-            video.append(line)
+        if "vp9" in line:
+            vp9_streams.append(line)
+        elif "avc" in line and "video only" in line:
+            avc_streams.append(line)
         elif "opus" in line:
             opus_streams.append(line)
         elif "m4a" in line and "audio only" in line:
@@ -45,18 +64,39 @@ def get_best_stream_codes(url):
         elif "av01" in line or "av1" in line:
             av1_streams.append(line)
 
-    video_code = get_best_video_code(vp9_streams)
-    opus_code = get_best_opus_code(opus_streams)
-    m4a_code = get_best_m4a_code(m4a_streams)
+    vp9_info = get_best_video_info(vp9_streams)
+    avc_info = get_best_video_info(video_streams)
+
+    opus_info = get_best_audio_info(opus_streams)
+    m4a_info = get_best_audio_info(m4a_streams)
 
     if args.b and len(av1_streams > 0):
-        av1_code = get_best_video_code(av1_streams)
+        av1_info = get_best_video_info(av1_streams)
     else:
-        av1_code = False
+        av1_info = False
+    
+    return vp9_info, avc_info, opus_info, m4a_info, av1_info
 
 
-# does yt-dlp -F and returns the ID code corresponding to the highest quality video stream
-def get_best_video_code(video_streams):
+def download_streams(url):
+    vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(url)
+
+
+# mux video file and audio file together
+def mux():
+    pass
+
+
+def remux_to_vp9mov():
+    pass
+
+
+def transcode_to_wav():
+    pass
+
+
+# does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
+def get_best_video_info(video_streams):
     # [10:19] is resolution, [22:24] is fps, [38:43] is bit rate 
     best_resolution = 0
     best_fps = 0
@@ -95,47 +135,28 @@ def get_best_video_code(video_streams):
     print("fps: " + str(best_fps))
     print("tbr: " + str(highest_bitrate))
 
-    return best_code
+    best_video_info = video_stream_info(best_code, best_resolution, best_fps, highest_bitrate)
 
-def get_best_opus_code(opus_streams):
+    return best_video_info
+
+
+def get_best_audio_info(audio_streams):
     # [38:43] is bit rate 
 
     highest_bitrate = 0
     best_code = 0
 
-    for stream in opus_streams:
+    for stream in audio_streams:
         tbr = int(stream[38:43].replace("k", ""))
 
         if tbr >= highest_bitrate:
             highest_bitrate = tbr
             best_code = int(stream[0:3])
     
-    print("----")
-    print("best - opus")
-    print("code: " + str(best_code))
-    print("tbr: " + str(highest_bitrate))
+    best_audio_info = audio_stream_info(best_code, highest_bitrate)
 
-    return best_code
+    return best_audio_info
 
-def get_best_m4a_code(m4a_streams):
-    # [38:43] is bit rate 
-
-    highest_bitrate = 0
-    best_code = 0
-
-    for stream in m4a_streams:
-        tbr = int(stream[38:43].replace("k", ""))
-
-        if tbr >= highest_bitrate:
-            highest_bitrate = tbr
-            best_code = int(stream[0:3])
-
-    print("----")
-    print("best - m4a")
-    print("code: " + str(best_code))
-    print("tbr: " + str(highest_bitrate))
-
-    return best_code
 
 args = get_args()
 print(args)
