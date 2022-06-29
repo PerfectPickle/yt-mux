@@ -40,12 +40,13 @@ def get_args():
 
     return parser.parse_args()
 
-def check_args():
+# return output as pathlib Path object if valid, else exit
+def check_get_output_arg():
     output = pathlib.Path(args.output)
 
     #if output is dir, or if directory to specified output file exists
     if output.is_dir() or pathlib.Path(os.path.split(str(args.output))[0]).is_dir():
-        pass
+        return output
     else:
         print("Invalid output.")
         ("-------------------------")
@@ -128,7 +129,7 @@ def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1
     #     subprocess.call(["mv", ])
 
 # mux video file and audio file together
-def mux(vid_to_mux, vp9_best, avc_best, av1_best):
+def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     # get files
     cwd_files = os.scandir()
 
@@ -164,6 +165,8 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best):
         #muxed_file_name = str(video_file.with_suffix(".mkv").name).replace(vcodec, "muxed")
         muxed_file_name = str(video_file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]_" + vcodec + "_muxed" + suffix
         muxed_file_name = muxed_file_name.replace(" ", "_")
+        if args.output:
+            args.
         subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", muxed_file_name], shell=False)
             
     
@@ -238,7 +241,7 @@ def get_best_audio_info(audio_streams):
 
 
 args = get_args()
-check_args()
+output = check_get_output_arg()
 
 # get best stream objects
 vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.url))
@@ -246,6 +249,6 @@ best_vid = determine_best_video_codec(vp9_best, avc_best)
 
 download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
 
-mux(best_vid, vp9_best, avc_best, av1_best)
+mux(best_vid, vp9_best, avc_best, av1_best, output)
 
 print(args)
