@@ -29,7 +29,8 @@ def create_parser():
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=os.getcwd())
     parser.add_argument("-r", action='store_true', help="make additional remux to Davinci Resolve friendly .mov file")
     parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND the best VP9/AVC stream")
-    parser.add_argument("-m", action='store_true', help="download separate m4a audio and make separate WAV file (pcm_s16le) transcode of downloaded m4a audio (useful for DaVinci Resolve)")
+    parser.add_argument("-m", action='store_true', help="make separate mp3 file (cbr) transcode of downloaded m4a audio")
+    parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
     return parser
 
 
@@ -106,8 +107,8 @@ def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1
 
     subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid.stream_id), url], shell=False)
     
-    # download best muxable audio, AND m4a if option selected and m4a not muxable
-    if vp9_best is best_vid and args.m:
+    # download best muxable audio, AND m4a if option selected and m4a not muxable. or av1 is set to download
+    if (vp9_best is best_vid and args.m) or (vp9_best is best_vid and av1_best and args.b):
         # download opus_best
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
         # download m4a_best
@@ -119,18 +120,15 @@ def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1
     else:
         print("This shouldn't happen, ever.")
 
-    if av1_best:
+    # download best av01 stream if exists and args.b
+    if av1_best and args.b:
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(av1_best.stream_id), url], shell=False)
-
-    # mux best video and audio
-
-    # remux to vp9mov if option selected
 
     # if str(args.output) != os.getcwd():
     #     subprocess.call(["mv", ])
 
 # mux video file and audio file together
-def mux(best_vid, vp9_best, avc_best):
+def mux(vid_to_mux, vp9_best, avc_best, av1_best):
     # get files
     cwd_files = os.scandir()
 
@@ -147,8 +145,12 @@ def mux(best_vid, vp9_best, avc_best):
     acodec = "opus"
     suffix = ".mkv"
 
-    if avc_best is best_vid:
+    if avc_best is vid_to_mux:
         vcodec = "avc"
+        acodec = "m4a"
+        suffix = ".mp4"
+    elif av1_best and av1_best is vid_to_mux:
+        vcodec = "av01"
         acodec = "m4a"
         suffix = ".mp4"
 
@@ -160,7 +162,7 @@ def mux(best_vid, vp9_best, avc_best):
 
     if video_file and audio_file:
         #muxed_file_name = str(video_file.with_suffix(".mkv").name).replace(vcodec, "muxed")
-        muxed_file_name = str(video_file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]_muxed" + suffix
+        muxed_file_name = str(video_file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]_" + vcodec + "_muxed" + suffix
         muxed_file_name = muxed_file_name.replace(" ", "_")
         subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", muxed_file_name], shell=False)
             
@@ -244,6 +246,6 @@ best_vid = determine_best_video_codec(vp9_best, avc_best)
 
 download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
 
-mux(best_vid, vp9_best, avc_best)
+mux(best_vid, vp9_best, avc_best, av1_best)
 
 print(args)
