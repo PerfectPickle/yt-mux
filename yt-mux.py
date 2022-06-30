@@ -23,10 +23,10 @@ class audio_stream_info:
 
 # create parser, add arguments, return parser
 def create_parser():
-    parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp, mediainfo")
 
     parser.add_argument("url", help="youtube URL to be processed", default=False)
-    parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=os.getcwd())
+    parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
     parser.add_argument("-r", action='store_true', help="make additional remux to Davinci Resolve friendly .mov file")
     parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND the best VP9/AVC stream")
     parser.add_argument("-m", action='store_true', help="make separate mp3 file (cbr) transcode of downloaded m4a audio")
@@ -42,15 +42,18 @@ def get_args():
 
 # return output as pathlib Path object if valid, else exit
 def check_get_output_arg():
-    output = pathlib.Path(args.output)
+    if args.output:
+        output = pathlib.Path(args.output)
 
-    #if output is dir, or if directory to specified output file exists
-    if output.is_dir() or pathlib.Path(os.path.split(str(args.output))[0]).is_dir():
-        return output
+        #if output is dir, or if directory to specified output file exists
+        if output.is_dir() or pathlib.Path(os.path.split(str(args.output))[0]).is_dir():
+            return output
+        else:
+            print("Invalid output.")
+            ("-------------------------")
+            exit()
     else:
-        print("Invalid output.")
-        ("-------------------------")
-        exit()
+        return False
 
 def get_best_streams(url):
     output = subprocess.check_output(["yt-dlp", "-F", url], shell=False)
@@ -67,7 +70,7 @@ def get_best_streams(url):
     for line in stream_info:
         if "vp9" in line:
             vp9_streams.append(line)
-        elif "avc" in line and "video only" in line:
+        elif "avc" in line:
             avc_streams.append(line)
         elif "opus" in line:
             opus_streams.append(line)
@@ -165,11 +168,38 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         #muxed_file_name = str(video_file.with_suffix(".mkv").name).replace(vcodec, "muxed")
         muxed_file_name = str(video_file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]_" + vcodec + "_muxed" + suffix
         muxed_file_name = muxed_file_name.replace(" ", "_")
-        if args.output:
-            args.
-        subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", muxed_file_name], shell=False)
+        if not output:
+            final_output_path = muxed_file_name
+        elif output.is_dir():
+            final_output_path = output.joinpath(muxed_file_name)
+        elif args.output and output.parent.is_dir():
+            final_output_path = str(output)
+
+        subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path], shell=False)
+        
+        output_file = pathlib.Path(final_output_path)
+
+    # rm pre-mux video and audio file
+    # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125) and mediainfo detected a video codec. 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
+        if output_file.is_file() and os.path.getsize(final_output_path) >= (5 * int(vid_to_mux.tbr) * 125) and len(get_video_codec(final_output_path)) >= 3:
+            os.remove(str(video_file.resolve()))
+            os.remove(str(audio_file.resolve()))
+        print(get_video_codec(final_output_path))
+
             
-    
+# returns 3+ letter video codec acronymn (uppercase) if video codec detected in file, else returns an empty string
+def get_video_codec(file_path):
+    try:
+        src_codec = str(subprocess.check_output(["toolbox", "run", "-c", "fedora_36", 'mediainfo', "--output=Video;%Format%", file_path]))
+    except:
+        src_codec = "f"
+            
+    # clean subprocess output, to either isolate video codec, or reduce to empty string
+    src_codec = src_codec.replace("b'", "")
+    src_codec = src_codec.replace("\\n'", "")
+    src_codec = src_codec.replace("\\r", "")
+
+    return src_codec.upper() 
         
 
 def remux_to_vp9mov():
@@ -180,15 +210,20 @@ def transcode_to_wav():
 
 # does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
 def get_best_video_info(video_streams):
-    # [10:19] is resolution, [22:24] is fps, [38:43] is bit rate 
+    # [10:19] is resolution, [21:24] is fps, [38:43] is bit rate 
     best_resolution = 0
     best_fps = 0
     highest_bitrate = 0
     best_code = 0
     for stream in video_streams:
-        res = int(str(stream[10:19].replace("x", "")))
-        fps = int(stream[22:24])
-        tbr = int(stream[38:43].replace("k", ""))
+        res = int(str(stream[9:19].replace("x", "").strip()))
+        fps = int(stream[21:24].strip())
+        tbr = int(stream[37:43].split("k")[0].strip())
+
+        print(stream)
+        print(res)
+        print(fps)
+        print(tbr)
 
         if res >= best_resolution and fps >= best_fps and tbr >= highest_bitrate:
             best_resolution = res
@@ -223,13 +258,13 @@ def get_best_video_info(video_streams):
     return best_video_info
 
 def get_best_audio_info(audio_streams):
-    # [38:43] is bit rate 
+    # [37:43] is bit rate 
 
     highest_bitrate = 0
     best_code = 0
 
     for stream in audio_streams:
-        tbr = int(stream[38:43].replace("k", ""))
+        tbr = int(stream[37:43].split("k")[0].strip())
 
         if tbr >= highest_bitrate:
             highest_bitrate = tbr
@@ -250,5 +285,7 @@ best_vid = determine_best_video_codec(vp9_best, avc_best)
 download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
 
 mux(best_vid, vp9_best, avc_best, av1_best, output)
+if av1_best and args.b:
+    mux(av1_best, vp9_best, avc_best, av1_best, output)
 
 print(args)
