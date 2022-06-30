@@ -85,7 +85,7 @@ def get_best_streams(url):
     opus_info = get_best_audio_info(opus_streams)
     m4a_info = get_best_audio_info(m4a_streams)
 
-    if args.b and len(av1_streams > 0):
+    if args.b and len(av1_streams) > 0:
         av1_info = get_best_video_info(av1_streams)
     else:
         av1_info = False
@@ -94,8 +94,8 @@ def get_best_streams(url):
 
 def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
     # to roughly equalize vp9 and avc quality-to-bitrate ratio. 
-    # avc is considered higher quality if its bitrate is more than double a vp9
-    avc_tbr_multiplier = 2.0
+    # avc is considered higher quality if its bitrate is more that of vp9_tbr * avc_tbr_multiplier
+    avc_tbr_multiplier = 1.5
 
     if vp9.fps >= avc.fps and vp9.res >= avc.res and vp9.tbr * avc_tbr_multiplier >= avc.tbr:
         return vp9
@@ -126,7 +126,7 @@ def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1
 
     # download best av01 stream if exists and args.b
     if av1_best and args.b:
-        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(av1_best.stream_id), url], shell=False)
+        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(av1_best.stream_id), url], shell=False)
 
     # if str(args.output) != os.getcwd():
     #     subprocess.call(["mv", ])
