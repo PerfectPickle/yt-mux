@@ -136,7 +136,7 @@ def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best,
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
     elif vp9_best is stream_to_dl:
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
-    elif avc_best is stream_to_dl:
+    elif avc_best is stream_to_dl or av1_best is stream_to_dl:
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
     else:
         print("This shouldn't happen, ever.")
