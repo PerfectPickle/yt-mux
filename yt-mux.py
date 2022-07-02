@@ -27,7 +27,7 @@ def create_parser():
 
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
-    parser.add_argument("-r", action='store_true', help="make additional remux to Davinci Resolve friendly .mov file")
+    parser.add_argument("-a", action='store_true', help="all codecs - download & mux all codecs available for the highest resolution available.")
     parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND the best VP9/AVC stream")
     parser.add_argument("-m", action='store_true', help="make separate mp3 file (cbr) transcode of downloaded m4a audio")
     parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
@@ -81,16 +81,36 @@ def get_best_streams(url):
 
     vp9_info = get_best_video_info(vp9_streams)
     avc_info = get_best_video_info(avc_streams)
+    
+    if len(av1_streams) > 0:
+        av1_info = get_best_video_info(av1_streams)
+    else:
+        av1_info = False
 
     opus_info = get_best_audio_info(opus_streams)
     m4a_info = get_best_audio_info(m4a_streams)
 
-    if args.b and len(av1_streams) > 0:
-        av1_info = get_best_video_info(av1_streams)
-    else:
-        av1_info = False
     
     return vp9_info, avc_info, opus_info, m4a_info, av1_info
+
+# returns a list of video_stream_info objects who meet the criteria of being at the maximum resolution available
+def get_streams_of_highest_res(vp9, avc, av1):
+    inputs = [vp9, avc]
+    if av1:
+        inputs.append(av1)
+
+    highest_res = 0
+    for stream in inputs:
+        if int(stream.res) > highest_res:
+            highest_res = int(stream.res)
+
+    avail_in_highest_res = []
+    for stream in inputs:
+        if int(stream.res) == highest_res:
+            avail_in_highest_res.append(stream)
+
+    return avail_in_highest_res
+
 
 def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
     # to roughly equalize vp9 and avc quality-to-bitrate ratio. 
@@ -107,29 +127,22 @@ def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
         print("-------------------------")
         exit()
 
-def download_streams(url, best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best):
+def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best, av1_best):
 
-    subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(best_vid.stream_id), url], shell=False)
+    subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(stream_to_dl.stream_id), url], shell=False)
     
     # download best muxable audio, AND m4a if option selected and m4a not muxable. or av1 is set to download
-    if (vp9_best is best_vid and args.m) or (vp9_best is best_vid and av1_best and args.b):
+    if vp9_best is stream_to_dl and args.m:
         # download opus_best
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
         # download m4a_best
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
-    elif vp9_best is best_vid:
+    elif vp9_best is stream_to_dl:
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
-    elif avc_best is best_vid:
+    elif avc_best is stream_to_dl:
         subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
     else:
         print("This shouldn't happen, ever.")
-
-    # download best av01 stream if exists and args.b
-    if av1_best and args.b:
-        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(av1_best.stream_id), url], shell=False)
-
-    # if str(args.output) != os.getcwd():
-    #     subprocess.call(["mv", ])
 
 # mux video file and audio file together
 def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
@@ -280,12 +293,15 @@ output = check_get_output_arg()
 
 # get best stream objects
 vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.url))
-best_vid = determine_best_video_codec(vp9_best, avc_best)
 
-download_streams(str(args.url), best_vid, vp9_best, avc_best, opus_best, m4a_best, av1_best)
 
-mux(best_vid, vp9_best, avc_best, av1_best, output)
-if av1_best and args.b:
-    mux(av1_best, vp9_best, avc_best, av1_best, output)
+if args.a:
+    streams_to_dl = get_streams_of_highest_res(vp9_best, avc_best, av1_best)
+else:
+    streams_to_dl = [(determine_best_video_codec(vp9_best, avc_best))]
+
+for stream in streams_to_dl:
+    download_streams(str(args.url), stream, vp9_best, avc_best, opus_best, m4a_best, av1_best)
+    mux(stream, vp9_best, avc_best, av1_best, output)
 
 print(args)
