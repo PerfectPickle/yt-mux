@@ -28,11 +28,9 @@ def create_parser():
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
     parser.add_argument("-a", action='store_true', help="all codecs - download & mux all codecs available for the highest resolution available.")
-    parser.add_argument("-b", action='store_true', help="in case of a competing av01 stream, download both it AND the best VP9/AVC stream")
     parser.add_argument("-m", action='store_true', help="make separate mp3 file (cbr) transcode of downloaded m4a audio")
     parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
     return parser
-
 
 # parse and return args
 def get_args():
@@ -111,7 +109,6 @@ def get_streams_of_highest_res(vp9, avc, av1):
 
     return avail_in_highest_res
 
-
 def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
     # to roughly equalize vp9 and avc quality-to-bitrate ratio. 
     # avc is considered higher quality if its bitrate is more that of vp9_tbr * avc_tbr_multiplier
@@ -188,7 +185,10 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         elif args.output and output.parent.is_dir():
             final_output_path = str(output)
 
-        subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path], shell=False)
+        mux_cmd = ["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
+        if args.w:
+            mux_cmd[12] = "pcm_s16le"
+        subprocess.call(mux_cmd, shell=False)
         
         output_file = pathlib.Path(final_output_path)
 
@@ -198,8 +198,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
             os.remove(str(video_file.resolve()))
             os.remove(str(audio_file.resolve()))
         print(get_video_codec(final_output_path))
-
-            
+  
 # returns 3+ letter video codec acronymn (uppercase) if video codec detected in file, else returns an empty string
 def get_video_codec(file_path):
     try:
@@ -213,10 +212,6 @@ def get_video_codec(file_path):
     src_codec = src_codec.replace("\\r", "")
 
     return src_codec.upper() 
-        
-
-def remux_to_vp9mov():
-    pass
 
 def transcode_to_wav():
     pass
@@ -293,7 +288,6 @@ output = check_get_output_arg()
 
 # get best stream objects
 vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.url))
-
 
 if args.a:
     streams_to_dl = get_streams_of_highest_res(vp9_best, avc_best, av1_best)
