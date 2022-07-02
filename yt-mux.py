@@ -141,7 +141,7 @@ def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best,
     else:
         print("This shouldn't happen, ever.")
 
-# mux video file and audio file together
+# mux video file and audio file together, returns list of premux files to remove as pathlib.Path() objects
 def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     # get files
     cwd_files = os.scandir()
@@ -153,6 +153,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
 
     print(video_ID)
 
+    files_to_rm = []
     video_file = False
     audio_file = False
     vcodec = "vp9"
@@ -166,7 +167,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     elif av1_best and av1_best is vid_to_mux:
         vcodec = "av01"
         acodec = "m4a"
-        suffix = ".mp4"
+        suffix = ".mkv"
 
     for file in cwd_files:
         if vcodec in file.name and video_ID in file.name and file.is_file():
@@ -186,7 +187,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
             final_output_path = str(output)
 
         mux_cmd = ["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
-        if args.w:
+        if args.w and suffix == ".mkv":
             mux_cmd[12] = "pcm_s16le"
         subprocess.call(mux_cmd, shell=False)
         
@@ -195,10 +196,17 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     # rm pre-mux video and audio file
     # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125) and mediainfo detected a video codec. 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
         if output_file.is_file() and os.path.getsize(final_output_path) >= (5 * int(vid_to_mux.tbr) * 125) and len(get_video_codec(final_output_path)) >= 3:
-            os.remove(str(video_file.resolve()))
-            os.remove(str(audio_file.resolve()))
-        print(get_video_codec(final_output_path))
-  
+            files_to_rm.append(video_file)
+            files_to_rm.append(audio_file)
+        #print(get_video_codec(final_output_path))
+
+    return files_to_rm
+
+def remove_premux_files(files_to_rm):
+    for file in files_to_rm:
+        if file.is_file():
+            os.remove(str(file.resolve()))
+
 # returns 3+ letter video codec acronymn (uppercase) if video codec detected in file, else returns an empty string
 def get_video_codec(file_path):
     try:
@@ -294,8 +302,17 @@ if args.a:
 else:
     streams_to_dl = [(determine_best_video_codec(vp9_best, avc_best))]
 
+files_to_rm = []
+
 for stream in streams_to_dl:
     download_streams(str(args.url), stream, vp9_best, avc_best, opus_best, m4a_best, av1_best)
-    mux(stream, vp9_best, avc_best, av1_best, output)
+    # mux stream with audio and get premux files
+    premux_files = mux(stream, vp9_best, avc_best, av1_best, output)
+
+    for file in premux_files:
+        if file not in files_to_rm:
+            files_to_rm.append(file)
+
+remove_premux_files(files_to_rm)
 
 print(args)
