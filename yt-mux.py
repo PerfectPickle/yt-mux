@@ -28,7 +28,7 @@ def create_parser():
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
     parser.add_argument("-a", action='store_true', help="all codecs - download & mux all codecs available for the highest resolution available.")
-    parser.add_argument("-m", action='store_true', help="make separate mp3 file (cbr) transcode of downloaded m4a audio")
+    parser.add_argument("-k", action='store_true', help="keep premux audio files")
     parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
     return parser
 
@@ -197,7 +197,8 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125) and mediainfo detected a video codec. 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
         if output_file.is_file() and os.path.getsize(final_output_path) >= (5 * int(vid_to_mux.tbr) * 125) and len(get_video_codec(final_output_path)) >= 3:
             files_to_rm.append(video_file)
-            files_to_rm.append(audio_file)
+            if not args.k:
+                files_to_rm.append(audio_file)
         #print(get_video_codec(final_output_path))
 
     return files_to_rm
