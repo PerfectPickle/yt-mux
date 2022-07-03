@@ -28,6 +28,7 @@ def create_parser():
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
     parser.add_argument("-a", action='store_true', help="all codecs - download & mux all codecs available for the highest resolution available.")
+    parser.add_argument("-m", action='store_true', help="force download of best m4a stream")
     parser.add_argument("-k", action='store_true', help="keep premux audio files")
     parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
     return parser
@@ -56,7 +57,8 @@ def check_get_output_arg():
 def get_best_streams(url):
     cmd = ["yt-dlp", "-F", url]
     if cookies_dir_entry and cookies_dir_entry.is_file():
-        cmd.append("--cookies").append(str(cookies_dir_entry.path))
+        cmd.append("--cookies")
+        cmd.append(str(cookies_dir_entry.path))
 
     output = subprocess.check_output(cmd, shell=False)
     data = output.decode("utf-8")
@@ -138,18 +140,31 @@ def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
 
 def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best, av1_best):
 
-    subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(stream_to_dl.stream_id), url], shell=False)
-    
+    vid_cmd = ["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(stream_to_dl.stream_id), url]
+    opus_cmd = ["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url]
+    m4a_cmd = ["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url]
+
+    # add cookies to cmd
+    if cookies_dir_entry and cookies_dir_entry.is_file():
+        vid_cmd.append("--cookies")
+        vid_cmd.append(str(cookies_dir_entry.path))
+        opus_cmd.append("--cookies")
+        opus_cmd.append(str(cookies_dir_entry.path))
+        m4a_cmd.append("--cookies")
+        m4a_cmd.append(str(cookies_dir_entry.path))
+
+    subprocess.call(vid_cmd, shell=False)
+
     # download best muxable audio, AND m4a if option selected and m4a not muxable. or av1 is set to download
     if vp9_best is stream_to_dl and args.m:
         # download opus_best
-        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
+        subprocess.call(opus_cmd, shell=False)
         # download m4a_best
-        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
+        subprocess.call(m4a_cmd, shell=False)
     elif vp9_best is stream_to_dl:
-        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(opus_best.stream_id), url], shell=False)
+        subprocess.call(opus_cmd, shell=False)
     elif avc_best is stream_to_dl or av1_best is stream_to_dl:
-        subprocess.call(["yt-dlp", "-o", "%(title)s [%(id)s]_%(acodec)s.%(ext)s", "-f", str(m4a_best.stream_id), url], shell=False)
+        subprocess.call(m4a_cmd, shell=False)
     else:
         print("This shouldn't happen, ever.")
 
