@@ -7,6 +7,7 @@ import argparse
 import os
 import subprocess
 import pathlib
+import numpy
 
 class video_stream_info:
     def __init__(self, stream_id, res, fps, tbr):
@@ -23,7 +24,7 @@ class audio_stream_info:
 
 # create parser, add arguments, return parser
 def create_parser():
-    parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp, mediainfo")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp, mediainfo, numpy")
 
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
@@ -64,7 +65,8 @@ def get_best_streams(url):
     data = output.decode("utf-8")
 
     stream_info = data.split('\n')
-    #data = os.system(str("yt-dlp -F " + url))
+    
+    txt_offset = 0
     vp9_streams = []
     avc_streams = []
     opus_streams = []
@@ -82,17 +84,20 @@ def get_best_streams(url):
             m4a_streams.append(line)
         elif "av01" in line or "av1" in line:
             av1_streams.append(line)
+        
+        if "-dash" in line[0:8]:
+            txt_offset = 5
 
-    vp9_info = get_best_video_info(vp9_streams)
-    avc_info = get_best_video_info(avc_streams)
+    vp9_info = get_best_video_info(vp9_streams, txt_offset)
+    avc_info = get_best_video_info(avc_streams, txt_offset)
     
     if len(av1_streams) > 0:
-        av1_info = get_best_video_info(av1_streams)
+        av1_info = get_best_video_info(av1_streams, txt_offset)
     else:
         av1_info = False
 
-    opus_info = get_best_audio_info(opus_streams)
-    m4a_info = get_best_audio_info(m4a_streams)
+    opus_info = get_best_audio_info(opus_streams, txt_offset)
+    m4a_info = get_best_audio_info(m4a_streams, txt_offset)
 
     
     return vp9_info, avc_info, opus_info, m4a_info, av1_info
@@ -261,16 +266,26 @@ def transcode_to_mp3(file, video_ID):
     mp3_transcode_made = True
 
 # does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
-def get_best_video_info(video_streams):
-    # [10:19] is resolution, [21:24] is fps, [38:43] is bit rate 
+def get_best_video_info(video_streams, stream_offset: int):
+    # [9:19] is resolution, [21:24] is fps, [37:43] is bit rate 
+    res_start = 9
+    res_end = 19
+    fps_start = 21
+    fps_end = 24
+    tbr_start = 37
+    tbr_end = 43
+
+    if stream_offset > 0:
+        res_start, res_end, fps_start, fps_end, tbr_start, tbr_end = numpy.add([res_start, res_end, fps_start, fps_end, tbr_start, tbr_end], stream_offset)
+        
     best_resolution = 0
     best_fps = 0
     highest_bitrate = 0
     best_code = 0
     for stream in video_streams:
-        res = int(str(stream[9:19].replace("x", "").strip()))
-        fps = int(stream[21:24].strip())
-        tbr = int(stream[37:43].split("k")[0].strip())
+        res = int(str(stream[res_start:res_end].replace("x", "").strip()))
+        fps = int(stream[fps_start:fps_end].strip())
+        tbr = int(stream[tbr_start:tbr_end].split("k")[0].strip())
 
         # not comparing tbr, to place a premium on res and fps, because sometiems lower res streams will have higher tbr than higher res ones.
         if res >= best_resolution and fps >= best_fps:
@@ -305,14 +320,19 @@ def get_best_video_info(video_streams):
 
     return best_video_info
 
-def get_best_audio_info(audio_streams):
+def get_best_audio_info(audio_streams, stream_offset: int):
     # [37:43] is bit rate 
+    tbr_start = 37
+    tbr_end = 43
+
+    if stream_offset > 0:
+        tbr_start, tbr_end = numpy.add([tbr_start, tbr_end], stream_offset)
 
     highest_bitrate = 0
     best_code = 0
 
     for stream in audio_streams:
-        tbr = int(stream[37:43].split("k")[0].strip())
+        tbr = int(stream[tbr_start:tbr_end].split("k")[0].strip())
 
         if tbr >= highest_bitrate:
             highest_bitrate = tbr
