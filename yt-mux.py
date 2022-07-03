@@ -156,12 +156,7 @@ def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best,
     subprocess.call(vid_cmd, shell=False)
 
     # download best muxable audio, AND m4a if option selected and m4a not muxable. or av1 is set to download
-    if vp9_best is stream_to_dl and args.m:
-        # download opus_best
-        subprocess.call(opus_cmd, shell=False)
-        # download m4a_best
-        subprocess.call(m4a_cmd, shell=False)
-    elif vp9_best is stream_to_dl:
+    if vp9_best is stream_to_dl:
         subprocess.call(opus_cmd, shell=False)
     elif avc_best is stream_to_dl or av1_best is stream_to_dl:
         subprocess.call(m4a_cmd, shell=False)
@@ -206,6 +201,9 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         #muxed_file_name = str(video_file.with_suffix(".mkv").name).replace(vcodec, "muxed")
         muxed_file_name = str(video_file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]_" + vcodec + "_muxed" + suffix
         muxed_file_name = muxed_file_name.replace(" ", "_")
+        muxed_file_name = muxed_file_name.replace("__", "")
+        muxed_file_name = muxed_file_name.replace("___", "")
+
         if not output:
             final_output_path = muxed_file_name
         elif output.is_dir():
@@ -228,7 +226,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
                 files_to_rm.append(audio_file)
         #print(get_video_codec(final_output_path))
 
-    if audio_file and args.m and not mp3_transcode_made:
+    if audio_file and args.m and mp3_transcode_made == False:
         transcode_to_mp3(audio_file, video_ID)
 
     return files_to_rm
@@ -255,7 +253,11 @@ def get_video_codec(file_path):
 def transcode_to_mp3(file, video_ID):
     output = str(file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]" + ".mp3"
     output = output.replace(" ", "_")
+    output = output.replace("__", "")
+    output = output.replace("___", "")
+
     subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-q:a", "0", output], shell=False)
+    global mp3_transcode_made
     mp3_transcode_made = True
 
 # does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
