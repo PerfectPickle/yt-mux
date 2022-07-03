@@ -214,7 +214,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
             final_output_path = str(output)
 
         mux_cmd = ["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
-        if args.w and suffix == ".mkv":
+        if args.w and vcodec == "vp9":
             mux_cmd[12] = "pcm_s16le"
         subprocess.call(mux_cmd, shell=False)
         
@@ -263,11 +263,6 @@ def get_best_video_info(video_streams):
         res = int(str(stream[9:19].replace("x", "").strip()))
         fps = int(stream[21:24].strip())
         tbr = int(stream[37:43].split("k")[0].strip())
-
-        print(stream)
-        print(res)
-        print(fps)
-        print(tbr)
 
         # not comparing tbr, to place a premium on res and fps, because sometiems lower res streams will have higher tbr than higher res ones.
         if res >= best_resolution and fps >= best_fps:
