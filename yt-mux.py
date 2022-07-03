@@ -242,7 +242,8 @@ def get_best_video_info(video_streams):
         print(fps)
         print(tbr)
 
-        if res >= best_resolution and fps >= best_fps and tbr >= highest_bitrate:
+        # not comparing tbr, to place a premium on res and fps, because sometiems lower res streams will have higher tbr than higher res ones.
+        if res >= best_resolution and fps >= best_fps:
             best_resolution = res
             best_fps = fps
             highest_bitrate = tbr
@@ -255,9 +256,9 @@ def get_best_video_info(video_streams):
             if fps >= best_fps:
                 print("fps is better")
                 has_better = True
-            if tbr >= highest_bitrate:
-                print("bitrate is higher")
-                has_better = True
+            # if tbr >= highest_bitrate:
+            #     print("bitrate is higher")
+            #     has_better = True
 
             if has_better:
                 print("The best video stream could not be be clearly determined.")
