@@ -264,12 +264,12 @@ def get_best_video_info(video_streams):
                 print("The best video stream could not be be clearly determined.")
                 exit()
 
-    print("----")
-    print("best - for unique vcodec")
-    print("code: " + str(best_code))
-    print("res: " + str(best_resolution))
-    print("fps: " + str(best_fps))
-    print("tbr: " + str(highest_bitrate))
+    # print("----")
+    # print("best - for unique vcodec")
+    # print("code: " + str(best_code))
+    # print("res: " + str(best_resolution))
+    # print("fps: " + str(best_fps))
+    # print("tbr: " + str(highest_bitrate))
 
     best_video_info = video_stream_info(best_code, best_resolution, best_fps, highest_bitrate)
 
