@@ -1,5 +1,5 @@
 """
-For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, generally favouring VP9 and av01. Situationally avc will be chosen depending on bit rate differential. Downloads first to CWD then moves file to output location if specified.
+For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, generally favouring VP9 and av01. Situationally avc will be chosen depending on bit rate differential. Downloads first to CWD then moves file to output location if specified. Looks for cookies.txt in ~/Downloads.
 """
 # the above docstring is accessible within the variable: __doc__
 
@@ -54,7 +54,11 @@ def check_get_output_arg():
         return False
 
 def get_best_streams(url):
-    output = subprocess.check_output(["yt-dlp", "-F", url], shell=False)
+    cmd = ["yt-dlp", "-F", url]
+    if cookies_dir_entry and cookies_dir_entry.is_file():
+        cmd.append("--cookies").append(str(cookies_dir_entry.path))
+
+    output = subprocess.check_output(cmd, shell=False)
     data = output.decode("utf-8")
 
     stream_info = data.split('\n')
@@ -90,6 +94,14 @@ def get_best_streams(url):
 
     
     return vp9_info, avc_info, opus_info, m4a_info, av1_info
+
+# returns cookies.txt path if found in ~/Downloads, else returns False
+def get_cookies():
+    entries = os.scandir(os.path.expanduser("~/Downloads"))
+    for entry in entries:
+        if entry.name == "cookies.txt":
+            return entry
+    return False
 
 # returns a list of video_stream_info objects who meet the criteria of being at the maximum resolution available
 def get_streams_of_highest_res(vp9, avc, av1):
@@ -295,6 +307,8 @@ def get_best_audio_info(audio_streams):
 
 args = get_args()
 output = check_get_output_arg()
+
+cookies_dir_entry = get_cookies()
 
 # get best stream objects
 vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.url))
