@@ -285,7 +285,11 @@ def get_best_video_info(video_streams, stream_offset: int):
     for stream in video_streams:
         res = int(str(stream[res_start:res_end].replace("x", "").strip()))
         fps = int(stream[fps_start:fps_end].strip())
-        tbr = int(stream[tbr_start:tbr_end].split("k")[0].strip())
+
+        tbr = stream[tbr_start:tbr_end].split("k")[0].strip()
+        tbr = tbr.replace("B", "")
+        tbr = tbr.replace("i", "")
+        tbr = int(tbr)
 
         # not comparing tbr, to place a premium on res and fps, because sometiems lower res streams will have higher tbr than higher res ones.
         if res >= best_resolution and fps >= best_fps:
@@ -332,8 +336,11 @@ def get_best_audio_info(audio_streams, stream_offset: int):
     best_code = 0
 
     for stream in audio_streams:
-        tbr = int(stream[tbr_start:tbr_end].split("k")[0].strip())
-
+        tbr = stream[tbr_start:tbr_end].split("k")[0].strip()
+        tbr = tbr.replace("B", "")
+        tbr = tbr.replace("i", "")
+        tbr = int(tbr)
+        
         if tbr >= highest_bitrate:
             highest_bitrate = tbr
             best_code = int(stream[0:3])
