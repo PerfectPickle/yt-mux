@@ -28,7 +28,7 @@ def create_parser():
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
     parser.add_argument("-a", action='store_true', help="all codecs - download & mux all codecs available for the highest resolution available.")
-    parser.add_argument("-m", action='store_true', help="make separate mp3 320k transcode of m4a")
+    parser.add_argument("-m", action='store_true', help="make separate mp3 ~245kbps transcode of audio")
     parser.add_argument("-k", action='store_true', help="keep premux audio files")
     parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
     return parser
@@ -221,7 +221,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         output_file = pathlib.Path(final_output_path)
 
     if audio_file and args.m and not mp3_transcode_made:
-        transcode_to_mp3(audio_file)
+        transcode_to_mp3(audio_file, video_ID)
 
     # rm pre-mux video and audio file
     # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125) and mediainfo detected a video codec. 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
@@ -252,8 +252,10 @@ def get_video_codec(file_path):
 
     return src_codec.upper() 
 
-def transcode_to_mp3(file):
-    subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-b:a", "320k", str(file.with_suffix(".mp3"))], shell=False)
+def transcode_to_mp3(file, video_ID):
+    output = str(file.name).split("[" + video_ID + "]")[0] + "[" + video_ID + "]" + ".mp3"
+    output = output.replace(" ", "_")
+    subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-q:a", "0", output], shell=False)
     mp3_transcode_made = True
 
 # does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
