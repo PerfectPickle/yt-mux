@@ -220,9 +220,6 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         
         output_file = pathlib.Path(final_output_path)
 
-    if audio_file and args.m and not mp3_transcode_made:
-        transcode_to_mp3(audio_file, video_ID)
-
     # rm pre-mux video and audio file
     # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125) and mediainfo detected a video codec. 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
         if output_file.is_file() and os.path.getsize(final_output_path) >= (5 * int(vid_to_mux.tbr) * 125) and len(get_video_codec(final_output_path)) >= 3:
@@ -230,6 +227,9 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
             if not args.k:
                 files_to_rm.append(audio_file)
         #print(get_video_codec(final_output_path))
+
+    if audio_file and args.m and not mp3_transcode_made:
+        transcode_to_mp3(audio_file, video_ID)
 
     return files_to_rm
 
