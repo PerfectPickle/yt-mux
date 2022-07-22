@@ -8,6 +8,7 @@ import os
 import subprocess
 import pathlib
 import numpy
+import time
 
 class video_stream_info:
     def __init__(self, stream_id, res, fps, tbr):
@@ -143,6 +144,27 @@ def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
         print("-------------------------")
         exit()
 
+def try_download_stream(cmd):
+    attempts = 0
+    dl_completed = False
+    while not dl_completed:
+        returncode = subprocess.call(cmd, shell=False)
+        if int(returncode) == 0:
+            dl_completed = True
+            attempts = 0
+        else:
+            attempts += 1
+            if attempts >= 15:
+                print("---")
+                print("Download failed after 15 attempts. Exiting..")
+                print("-------------------------")
+                exit()
+            else:
+                print("---")
+                print("Download attempt #" + str(attempts) + " failed. Trying again in 5 seconds.. ")
+                print("---")
+                time.sleep(5)
+
 def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best, av1_best):
 
     vid_cmd = ["yt-dlp", "-o", "%(title)s [%(id)s]_%(vcodec)s.%(ext)s", "-f", str(stream_to_dl.stream_id), url]
@@ -158,13 +180,13 @@ def download_streams(url, stream_to_dl, vp9_best, avc_best, opus_best, m4a_best,
         m4a_cmd.append("--cookies")
         m4a_cmd.append(str(cookies_dir_entry.path))
 
-    subprocess.call(vid_cmd, shell=False)
+    try_download_stream(vid_cmd)
 
     # download best muxable audio, AND m4a if option selected and m4a not muxable. or av1 is set to download
     if vp9_best is stream_to_dl:
-        subprocess.call(opus_cmd, shell=False)
+        try_download_stream(opus_cmd)
     elif avc_best is stream_to_dl or av1_best is stream_to_dl:
-        subprocess.call(m4a_cmd, shell=False)
+        try_download_stream(m4a_cmd)
     else:
         print("This shouldn't happen, ever.")
 
