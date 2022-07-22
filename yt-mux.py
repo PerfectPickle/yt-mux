@@ -1,5 +1,5 @@
 """
-For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, generally favouring VP9 and av01. Situationally avc will be chosen depending on bit rate differential. Downloads first to CWD then moves file to output location if specified. Looks for cookies.txt in ~/Downloads.
+For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, generally favouring VP9, situationally avc depending on bitrate. Downloads first to CWD then moves file to output location if specified. Looks for cookies.txt in ~/Downloads.
 """
 # the above docstring is accessible within the variable: __doc__
 
@@ -33,6 +33,8 @@ def create_parser():
     parser.add_argument("-m", action='store_true', help="make separate mp3 ~245kbps transcode of audio")
     parser.add_argument("-k", action='store_true', help="keep premux audio files")
     parser.add_argument("-w", action='store_true', help="if video is downloaded to vp9.mkv, transcode audio to WAV (pcm_s16le) and mux into vp9 video (useful for DaVinci Resolve)")
+    parser.add_argument("-v", action='store_true', help="only download av1 video")
+    parser.add_argument("-p", action='store_true', help="only download vp9 video")
     return parser
 
 # parse and return args
@@ -387,6 +389,16 @@ vp9_best, avc_best, opus_best, m4a_best, av1_best = get_best_streams(str(args.ur
 
 if args.a:
     streams_to_dl = get_streams_of_highest_res(vp9_best, avc_best, av1_best)
+elif args.v:
+    if av1_best and av1_best in get_streams_of_highest_res(vp9_best, avc_best, av1_best):
+        streams_to_dl = [av1_best]
+    else:
+        print("---")
+        print("Found no av1 video of highest res (any codec). Exiting..")
+        print("-------------------------")
+        exit()
+elif args.p:
+    streams_to_dl = [vp9_best]
 else:
     streams_to_dl = [(determine_best_video_codec(vp9_best, avc_best))]
 
