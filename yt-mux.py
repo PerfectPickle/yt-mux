@@ -24,7 +24,7 @@ class audio_stream_info:
 
 # create parser, add arguments, return parser
 def create_parser():
-    parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp, mediainfo, numpy")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Dependencies: ffmpeg, yt-dlp, numpy")
 
     parser.add_argument("url", help="youtube URL to be processed", default=False)
     parser.add_argument("output", help="target output directory or file. If not specified, defaults to CWD", nargs='?', default=False)
@@ -224,12 +224,11 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         output_file = pathlib.Path(final_output_path)
 
     # rm pre-mux video and audio file
-    # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125) and mediainfo detected a video codec. 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
-        if output_file.is_file() and os.path.getsize(final_output_path) >= (5 * int(vid_to_mux.tbr) * 125) and len(get_video_codec(final_output_path)) >= 3:
+    # if bytes are more than 5 secs worth of video according to tbr (sec × tbr × 125). 125 is kilobit to byte conversion rate so tbr * 125 = bytes/s
+        if output_file.is_file() and os.path.getsize(final_output_path) >= (5 * int(vid_to_mux.tbr) * 125):
             files_to_rm.append(video_file)
             if not args.k:
                 files_to_rm.append(audio_file)
-        #print(get_video_codec(final_output_path))
 
     if audio_file and args.m and mp3_transcode_made == False:
         transcode_to_mp3(audio_file, video_ID)
@@ -241,17 +240,22 @@ def remove_premux_files(files_to_rm):
         if file.is_file():
             os.remove(str(file.resolve()))
 
+# currently broken as toolbox mediainfo is not working with "toolbox run" anymore
 # returns 3+ letter video codec acronymn (uppercase) if video codec detected in file, else returns an empty string
 def get_video_codec(file_path):
     try:
         src_codec = str(subprocess.check_output(["toolbox", "run", "-c", "fedora_36", 'mediainfo', "--output=Video;%Format%", file_path]))
     except:
         src_codec = "f"
-            
+    
+    print(src_codec)
+
     # clean subprocess output, to either isolate video codec, or reduce to empty string
     src_codec = src_codec.replace("b'", "")
     src_codec = src_codec.replace("\\n'", "")
     src_codec = src_codec.replace("\\r", "")
+
+    print(src_codec)
 
     return src_codec.upper() 
 
@@ -364,17 +368,11 @@ if args.a:
 else:
     streams_to_dl = [(determine_best_video_codec(vp9_best, avc_best))]
 
-files_to_rm = []
 
 for stream in streams_to_dl:
     download_streams(str(args.url), stream, vp9_best, avc_best, opus_best, m4a_best, av1_best)
     # mux stream with audio and get premux files
     premux_files = mux(stream, vp9_best, avc_best, av1_best, output)
-
-    for file in premux_files:
-        if file not in files_to_rm:
-            files_to_rm.append(file)
-
-remove_premux_files(files_to_rm)
+    remove_premux_files(premux_files)
 
 print(args)
