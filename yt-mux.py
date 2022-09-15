@@ -218,7 +218,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     elif av1_best and av1_best is vid_to_mux:
         vcodec = "av01"
         acodec = "m4a"
-        suffix = ".mkv"
+        suffix = ".mp4"
 
     for file in cwd_files:
         if vcodec in file.name and video_ID in file.name and file.is_file():
