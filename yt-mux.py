@@ -199,6 +199,8 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
 
     if "youtu.be/" in str(args.url):
         video_ID = str(args.url).split(".be/")[1].split('/')[0]
+    elif "/shorts/" in str(args.url):
+        video_ID = str(args.url).split("/shorts/")[1].split('/')[0]
     else:
         video_ID = str(args.url).split("/watch?v=")[1].split('/')[0]
 
@@ -293,15 +295,15 @@ def transcode_to_mp3(file, video_ID):
     global mp3_transcode_made
     mp3_transcode_made = True
 
-# does yt-dlp -F and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
+# processes yt-dlp -F output line (streams arg) and returns a dict containing the ID code, resolution, fps, and bitrate of the highest quality video stream
 def get_best_video_info(video_streams, stream_offset: int):
     # [9:19] is resolution, [21:24] is fps, [37:43] is bit rate 
     res_start = 9
     res_end = 19
     fps_start = 21
     fps_end = 24
-    tbr_start = 37
-    tbr_end = 43
+    tbr_start = 40
+    tbr_end = 46
 
     if stream_offset > 0:
         res_start, res_end, fps_start, fps_end, tbr_start, tbr_end = numpy.add([res_start, res_end, fps_start, fps_end, tbr_start, tbr_end], stream_offset)
@@ -354,8 +356,8 @@ def get_best_video_info(video_streams, stream_offset: int):
 
 def get_best_audio_info(audio_streams, stream_offset: int):
     # [37:43] is bit rate 
-    tbr_start = 37
-    tbr_end = 43
+    tbr_start = 40
+    tbr_end = 46
 
     if stream_offset > 0:
         tbr_start, tbr_end = numpy.add([tbr_start, tbr_end], stream_offset)
