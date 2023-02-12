@@ -222,6 +222,9 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         acodec = "m4a"
         suffix = ".mp4"
 
+    if args.w and vcodec == "vp9":
+        acodec = "m4a"
+
     for file in cwd_files:
         if vcodec in file.name and video_ID in file.name and file.is_file():
             video_file = pathlib.Path(file.path)
@@ -242,7 +245,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         elif args.output and output.parent.is_dir():
             final_output_path = str(output)
 
-        mux_cmd = ["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
+        mux_cmd = ["toolbox", "run", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
         if args.w and vcodec == "vp9":
             mux_cmd[12] = "pcm_s16le"
         subprocess.call(mux_cmd, shell=False)
@@ -270,7 +273,7 @@ def remove_premux_files(files_to_rm):
 # returns 3+ letter video codec acronymn (uppercase) if video codec detected in file, else returns an empty string
 def get_video_codec(file_path):
     try:
-        src_codec = str(subprocess.check_output(["toolbox", "run", "-c", "fedora_36", 'mediainfo', "--output=Video;%Format%", file_path]))
+        src_codec = str(subprocess.check_output(["toolbox", "run", 'mediainfo', "--output=Video;%Format%", file_path]))
     except:
         src_codec = "f"
     
@@ -291,7 +294,7 @@ def transcode_to_mp3(file, video_ID):
     output = output.replace("__", "")
     output = output.replace("___", "")
 
-    subprocess.call(["toolbox", "run", "-c", "fedora_36", "ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-q:a", "0", output], shell=False)
+    subprocess.call(["toolbox", "run", "ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-q:a", "0", output], shell=False)
     global mp3_transcode_made
     mp3_transcode_made = True
 
