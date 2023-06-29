@@ -1,5 +1,5 @@
 """
-For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, generally favouring VP9, situationally avc depending on bitrate. Downloads first to CWD then moves file to output location if specified. Looks for cookies.txt in ~/Downloads.
+For use on Linux only. Wrapper for yt-dlp and ffmpeg which downloads and muxes the actual best streams available for a given YT URL, by deafult preferring avc. Downloads first to CWD then moves file to output location if specified. Looks for cookies.txt in ~/Downloads.
 """
 # the above docstring is accessible within the variable: __doc__
 
@@ -135,11 +135,11 @@ def determine_best_video_codec(vp9: video_stream_info, avc: video_stream_info):
     # to roughly equalize vp9 and avc quality-to-bitrate ratio. 
     # avc is considered higher quality if its bitrate is more that of vp9_tbr * avc_tbr_multiplier
     avc_tbr_multiplier = 1.5
-
-    if vp9.fps >= avc.fps and vp9.res >= avc.res and vp9.tbr * avc_tbr_multiplier >= avc.tbr:
-        return vp9
-    elif avc.fps >= vp9.fps and avc.res >= vp9.res and avc.tbr >= vp9.tbr * avc_tbr_multiplier:
+    
+    if avc.fps >= vp9.fps and avc.res >= vp9.res: # and avc.tbr >= vp9.tbr * avc_tbr_multiplier:
         return avc
+    elif vp9.fps >= avc.fps and vp9.res >= avc.res: # and vp9.tbr * avc_tbr_multiplier >= avc.tbr:
+        return vp9
     else:
         print("---")
         print("Could not clearly determine if vp9 or avc stream is higher quality.")
@@ -156,9 +156,9 @@ def try_download_stream(cmd):
             attempts = 0
         else:
             attempts += 1
-            if attempts >= 15:
+            if attempts >= 100:
                 print("---")
-                print("Download failed after 15 attempts. Exiting..")
+                print("Download failed after 100 attempts. Exiting..")
                 print("-------------------------")
                 exit()
             else:
