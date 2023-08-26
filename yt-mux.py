@@ -9,6 +9,8 @@ import subprocess
 import pathlib
 import numpy
 import time
+import re
+import json
 
 class video_stream_info:
     def __init__(self, stream_id, res, fps, tbr):
@@ -59,15 +61,15 @@ def check_get_output_arg():
         return False
 
 def get_best_streams(url):
-    cmd = ["yt-dlp", "-F", url]
-    if cookies_dir_entry and cookies_dir_entry.is_file():
-        cmd.append("--cookies")
-        cmd.append(str(cookies_dir_entry.path))
+    # cmd = ["yt-dlp", "-F", url]
+    # if cookies_dir_entry and cookies_dir_entry.is_file():
+    #     cmd.append("--cookies")
+    #     cmd.append(str(cookies_dir_entry.path))
+    cmd = ["yt-dlp", "--dump-json", url]
+    formats = json.loads(subprocess.check_output(cmd, shell=False).decode("utf-8"))["formats"]
+    # data = output.decode("utf-8")
 
-    output = subprocess.check_output(cmd, shell=False)
-    data = output.decode("utf-8")
-
-    stream_info = data.split('\n')
+    # stream_info = data.split('\n')
     
     txt_offset = 0
     vp9_streams = []
@@ -76,20 +78,37 @@ def get_best_streams(url):
     m4a_streams = []
     av1_streams = []
 
-    for line in stream_info:
-        if "vp9" in line:
-            vp9_streams.append(line)
-        elif "avc" in line:
-            avc_streams.append(line)
-        elif "opus" in line:
-            opus_streams.append(line)
-        elif "m4a" in line and "audio only" in line:
-            m4a_streams.append(line)
-        elif "av01" in line or "av1" in line:
-            av1_streams.append(line)
+    # for line in stream_info:
+    #     if "vp9" in line:
+    #         vp9_streams.append(line)
+    #     elif "avc" in line:
+    #         avc_streams.append(line)
+    #     elif "opus" in line:
+    #         opus_streams.append(line)
+    #     elif "m4a" in line and "audio only" in line:
+    #         m4a_streams.append(line)
+    #     elif "av01" in line or "av1" in line:
+    #         av1_streams.append(line)
         
-        if "-dash" in line[0:8]:
-            txt_offset = 5
+    #     if "-dash" in line[0:8]:
+    #         txt_offset = 5
+
+    for stream in formats:
+        vcodec = stream.get("vcodec", "")
+        ext = stream.get("ext", "")
+        acodec = stream.get("acodec", "")
+        resolution = stream.get("resolution", "")
+
+        if ("vp9" in vcodec or "vp09" in vcodec) and "webm" in ext:
+            vp9_streams.append(stream)
+        elif "avc" in vcodec and "mp4" in ext:
+            avc_streams.append(stream)
+        elif "opus" in acodec and "audio only" in resolution:
+            opus_streams.append(stream)
+        elif "m4a" in acodec and "audio only" in resolution:
+            m4a_streams.append(stream)
+        elif "av01" in vcodec or "av1" in vcodec:
+            av1_streams.append(stream)
 
     vp9_info = get_best_video_info(vp9_streams, txt_offset)
     avc_info = get_best_video_info(avc_streams, txt_offset)
@@ -315,21 +334,29 @@ def get_best_video_info(video_streams, stream_offset: int):
     best_fps = 0
     highest_bitrate = 0
     best_code = 0
-    for stream in video_streams:
-        res = int(str(stream[res_start:res_end].replace("x", "").strip()))
-        fps = int(stream[fps_start:fps_end].strip())
 
-        tbr = stream[tbr_start:tbr_end].split("k")[0].strip()
-        tbr = tbr.replace("B", "")
-        tbr = tbr.replace("i", "")
-        tbr = int(tbr)
+    ### use yt-dlp --dump-json to get json, then grab formats list of dicts from that 
+    for stream in video_streams:
+        # breaks into list like so: ['598', 'webm', '256x144', '12', '378.89KiB', '31k', 'https', 'vp9', '31k', 'video', 'only', '144p,', 'webm_dash']
+        # stream_items = [item.strip() for item in stream.split() if item.strip() != "|"]
+        # print(stream_items)
+        # res = int(str(stream_items[2].replace("x", "").strip()))
+        # fps = int(stream_items[3].strip())
+
+        # # removes all non-digits from tbr entry
+        # tbr = int(''.join(re.findall(r'\d', stream_items[5])))
+
+        res = int("".join([str(stream["width"]), str(stream["height"])]))
+        fps = int(stream["fps"])
+        tbr = int(stream["tbr"])
+
 
         # not comparing tbr, to place a premium on res and fps, because sometiems lower res streams will have higher tbr than higher res ones.
         if res >= best_resolution and fps >= best_fps:
             best_resolution = res
             best_fps = fps
             highest_bitrate = tbr
-            best_code = int(stream[0:3])
+            best_code = stream["format_id"]
         else:
             has_better = False
             if res >= best_resolution:
@@ -359,26 +386,44 @@ def get_best_video_info(video_streams, stream_offset: int):
 
 def get_best_audio_info(audio_streams, stream_offset: int):
     # [37:43] is bit rate 
-    tbr_start = 40
-    tbr_end = 46
+    # tbr_start = 40
+    # tbr_end = 46
+
+    # if stream_offset > 0:
+    #     tbr_start, tbr_end = numpy.add([tbr_start, tbr_end], stream_offset)
+
+    # highest_bitrate = 0
+    # best_code = 0
+
+    # for stream in audio_streams:
+    #     tbr = stream[tbr_start:tbr_end].split("k")[0].strip()
+    #     tbr = tbr.replace("B", "")
+    #     tbr = tbr.replace("i", "")
+    #     tbr = int(tbr)
+        
+    #     if tbr >= highest_bitrate:
+    #         highest_bitrate = tbr
+    #         best_code = int(stream[0:3])
+    
+    # best_audio_info = audio_stream_info(best_code, highest_bitrate)
+
+    # return best_audio_info
+    tbr_key = "tbr"  # Replace with the correct key for tbr in the audio stream dictionary
 
     if stream_offset > 0:
-        tbr_start, tbr_end = numpy.add([tbr_start, tbr_end], stream_offset)
+        tbr_key = str(stream_offset)
 
     highest_bitrate = 0
     best_code = 0
 
     for stream in audio_streams:
-        tbr = stream[tbr_start:tbr_end].split("k")[0].strip()
-        tbr = tbr.replace("B", "")
-        tbr = tbr.replace("i", "")
-        tbr = int(tbr)
-        
+        tbr = int(stream.get(tbr_key, 0))  # Retrieve the tbr value using the tbr_key
+
         if tbr >= highest_bitrate:
             highest_bitrate = tbr
-            best_code = int(stream[0:3])
-    
-    best_audio_info = audio_stream_info(best_code, highest_bitrate)
+            best_code = int(stream.get("format_id", 0))
+
+    best_audio_info = audio_stream_info(best_code, highest_bitrate)  # Define audio_stream_info() accordingly
 
     return best_audio_info
 
