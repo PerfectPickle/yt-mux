@@ -105,7 +105,7 @@ def get_best_streams(url):
             avc_streams.append(stream)
         elif "opus" in acodec and "audio only" in resolution:
             opus_streams.append(stream)
-        elif "m4a" in acodec and "audio only" in resolution:
+        elif "mp4a" in acodec and "audio only" in resolution:
             m4a_streams.append(stream)
         elif "av01" in vcodec or "av1" in vcodec:
             av1_streams.append(stream)
@@ -228,7 +228,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
     files_to_rm = []
     video_file = False
     audio_file = False
-    vcodec = "vp9"
+    vcodec = "vp09"
     acodec = "opus"
     suffix = ".mkv"
 
@@ -241,11 +241,14 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         acodec = "m4a"
         suffix = ".mp4"
 
-    if args.w and vcodec == "vp9":
+    if args.w and vcodec in ["vp09", "vp9"]:
         acodec = "m4a"
 
     for file in cwd_files:
         if vcodec in file.name and video_ID in file.name and file.is_file():
+            video_file = pathlib.Path(file.path)
+        elif "vp9" in file.name and video_ID in file.name and file.is_file():
+            vcodec = "vp9"
             video_file = pathlib.Path(file.path)
         elif acodec in file.name and video_ID in file.name and file.is_file():
             audio_file = pathlib.Path(file.path)
@@ -264,7 +267,7 @@ def mux(vid_to_mux, vp9_best, avc_best, av1_best, output):
         elif args.output and output.parent.is_dir():
             final_output_path = str(output)
 
-        mux_cmd = ["toolbox", "run", "ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
+        mux_cmd = ["ffmpeg", "-i", video_file.name, "-i", audio_file.name, "-c:v", "copy", "-c:a", "copy", final_output_path]
         if args.w and vcodec == "vp9":
             mux_cmd[12] = "pcm_s16le"
         subprocess.call(mux_cmd, shell=False)
@@ -313,7 +316,7 @@ def transcode_to_mp3(file, video_ID):
     output = output.replace("__", "")
     output = output.replace("___", "")
 
-    subprocess.call(["toolbox", "run", "ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-q:a", "0", output], shell=False)
+    subprocess.call(["ffmpeg", "-i", file.name, "-c:a", "libmp3lame", "-q:a", "0", output], shell=False)
     global mp3_transcode_made
     mp3_transcode_made = True
 
