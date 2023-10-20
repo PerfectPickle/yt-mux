@@ -424,7 +424,8 @@ def get_best_audio_info(audio_streams, stream_offset: int):
 
         if tbr >= highest_bitrate:
             highest_bitrate = tbr
-            best_code = int(stream.get("format_id", 0))
+            best_code = stream.get("format_id", 0)
+
 
     best_audio_info = audio_stream_info(best_code, highest_bitrate)  # Define audio_stream_info() accordingly
 

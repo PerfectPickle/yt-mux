@@ -1,0 +1,1 @@
+**yt-mux** is a wrapper for yt-dlp and ffmpeg made for myself to simplify the process of download and muxing the actual best streams available for a given YT URL on Linux, with other options. I know a bash script using built in options of yt-dlp could do the same thing but I felt like using Python. There is some cleaning up to do as it's just been a personal-use script.
